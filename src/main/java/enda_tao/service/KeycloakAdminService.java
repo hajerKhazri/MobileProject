@@ -60,31 +60,24 @@ public class KeycloakAdminService {
      * Vérifie que l'utilisateur est Regional Supervisor
      */
     public String assignRegionToUser(String userId, String region) {
+
     RealmResource realmResource = keycloak.realm(realm);
     UserResource userResource = realmResource.users().get(userId);
 
-    // Vérifier le rôle
-    List<String> roles = userResource.roles()
-            .realmLevel()
-            .listAll()
-            .stream()
-            .map(RoleRepresentation::getName)
-            .collect(Collectors.toList());
+    UserRepresentation userRep = userResource.toRepresentation();
 
-    if (!roles.contains("ROLE_REGIONAL_SUPERVISOR")) {
-        return "Erreur : L'utilisateur n'est pas Regional Supervisor";
+    if (userRep == null) {
+        return "Utilisateur introuvable";
     }
 
     // 🔵 récupérer toutes les régions existantes
     List<String> existingRegions = getAllRegions();
 
-    // vérifier si la région existe
     if (!existingRegions.contains(region)) {
-        return "Erreur : La région '" + region + "' n'existe pas dans Keycloak";
+        return "Erreur : La région '" + region + "' n'existe pas";
     }
 
-    // mettre à jour l'attribut region
-    UserRepresentation userRep = userResource.toRepresentation();
+    // 🔵 mettre à jour l'attribut
     Map<String, List<String>> attrs = userRep.getAttributes();
 
     if (attrs == null) {
@@ -98,7 +91,6 @@ public class KeycloakAdminService {
 
     return "Région '" + region + "' assignée avec succès";
 }
-
     /**
      * Retourne la liste de toutes les régions existantes (attribut region)
      */

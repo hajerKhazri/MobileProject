@@ -17,11 +17,8 @@ public class User {
     private String password;
     private Boolean isEnabled;
     private String region;
-    private String role; // Ajout du champ role pour stocker le rôle de l'utilisateur
-  
+    private String role; 
 
-
-    // Nouveau champ pour suppression logique
     @Column(nullable = false)
     private Boolean isDeleted = false;
 
@@ -40,7 +37,7 @@ public class User {
 
     }
 
-    // Getters et setters
+  
     public Long getId() { return id; }
 
     public String getUsername() { return username; }

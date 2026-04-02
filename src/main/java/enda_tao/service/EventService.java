@@ -22,24 +22,35 @@ public class EventService {
     }
 
     // Création d'un événement
-    public Event createEvent(Event event) {
-        String username = SecurityUtils.getUsername();
+    // Création d'un événement
+public Event createEvent(Event event) {
+    String username = SecurityUtils.getUsername();
 
-        // Récupération de la région depuis la DB
-        String region = userRepository.findByUsername(username)
-                .map(u -> u.getRegion() != null ? u.getRegion() : "")
-                .orElse("");
+    // Récupération de la région depuis la DB
+    String region = userRepository.findByUsername(username)
+            .map(u -> u.getRegion() != null ? u.getRegion() : "")
+            .orElse("");
 
-        event.setCreatedBy(username);
-        event.setRegion(region);
-        
+    event.setCreatedBy(username);
+    event.setRegion(region);
 
-            if (event.getAgents() == null) {
-        event.setAgents(new ArrayList<>());
+    // ⚡ Assurer que superviseur est non nul et unique
+    if (event.getSuperviseur() == null || event.getSuperviseur().isEmpty()) {
+        // Si aucun superviseur sélectionné, mettre au moins le créateur
+        List<String> defaultSuperviseur = new ArrayList<>();
+        defaultSuperviseur.add(username);
+        event.setSuperviseur(defaultSuperviseur);
+    } else {
+        // Trim et supprimer doublons
+        List<String> cleanSuperviseur = event.getSuperviseur().stream()
+                .map(String::trim)
+                .distinct()
+                .toList();
+        event.setSuperviseur(cleanSuperviseur);
     }
 
-        return eventRepository.save(event);
-    }
+    return eventRepository.save(event);
+}
 
     // Récupérer tous les événements selon le rôle
     // GET /api/events pour l'utilisateur courant
@@ -70,14 +81,14 @@ public List<Event> getAllEvents() {
         // Retourner événements où créé par ces utilisateurs OU assigné à eux
         return eventRepository.findAll().stream()
                 .filter(ev -> usernamesToInclude.contains(ev.getCreatedBy())
-                        || (ev.getAgents() != null && ev.getAgents().contains(username)))
+                        || (ev.getSuperviseur() != null && ev.getSuperviseur().contains(username)))
                 .toList();
     }
 
     // Utilisateur normal → lui-même et événements où il est assigné
     return eventRepository.findAll().stream()
             .filter(ev -> username.equals(ev.getCreatedBy())
-                    || (ev.getAgents() != null && ev.getAgents().contains(username)))
+                    || (ev.getSuperviseur() != null && ev.getSuperviseur().contains(username)))
             .toList();
 }
 
@@ -129,5 +140,10 @@ public List<Event> getAllEvents() {
 
     return eventRepository.save(event);
 }
+
+  public List<Event> getEventBySuperviseur(String superviseur) {
+        return eventRepository.findBySuperviseur(superviseur);
+    }
+    
 
 }

@@ -40,7 +40,8 @@ public class SecurityConfig {
                     "/sync-users",
                     "/reset-sync",
                     "/api/events/**",
-                    "/dashboard/superviseur/{name}"
+                    "/dashboard/superviseur/{name}",
+                    "/api/localisation_ap/superviseur/**"
                    
                 ).permitAll()
                     
@@ -67,7 +68,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
         // Autorise le frontend Angular
-        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+        configuration.setAllowedOrigins(List.of("http://192.168.150.163:4200"));
         // Autorise les méthodes HTTP courantes + OPTIONS
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         // Autorise les headers nécessaires pour Angular

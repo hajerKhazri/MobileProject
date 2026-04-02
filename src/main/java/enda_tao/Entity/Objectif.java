@@ -9,7 +9,7 @@ public class Objectif {
     @Id
     private String msisdn;
 
-    @Column(name = "Superviseur") // correspond à la colonne dans la BDD
+    @Column(name = "Superviseur")
     private String superviseur;
     private String nom;
     private String prenom;
@@ -54,7 +54,6 @@ public class Objectif {
         this.nombreTopnet = nombreTopnet;
     }
 
-    // Getters & Setters
     public String getMsisdn() { return msisdn; }
     public void setMsisdn(String msisdn) { this.msisdn = msisdn; }
 

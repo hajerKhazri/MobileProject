@@ -15,21 +15,16 @@ import java.util.Map;
 @RequestMapping("/auth")
 public class AuthController {
 
-    private final String TOKEN_URL = "http://localhost:8088/realms/enda_tao_realm/protocol/openid-connect/token";
+    private final String TOKEN_URL = "http://192.168.150.163:8088/realms/enda_tao_realm/protocol/openid-connect/token";
     private final String CLIENT_ID = "enda_tao_client";
     private final String CLIENT_SECRET = "gCKB6HWAEtPZOYg2n9naXagskjoI0UHY";
-
-
-    private final String LOGOUT_URL =
-            "http://localhost:8088/realms/enda_tao_realm/protocol/openid-connect/logout";
+    private final String LOGOUT_URL ="http://192.168.150.163:8088/realms/enda_tao_realm/protocol/openid-connect/logout";
 
 
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestParam String username, @RequestParam String password) {
 
         RestTemplate restTemplate = new RestTemplate();
-
-        // Préparer les paramètres en x-www-form-urlencoded
         MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
         map.add("grant_type", "password");
         map.add("client_id", CLIENT_ID);
@@ -52,36 +47,35 @@ public class AuthController {
 
 
     @PostMapping("/logout")
-public ResponseEntity<?> logout(@RequestParam String refreshToken) {
+    public ResponseEntity<?> logout(@RequestParam String refreshToken) {
 
     RestTemplate restTemplate = new RestTemplate();
 
-    // Créer la map avec les paramètres pour Keycloak
     MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
     map.add("client_id", CLIENT_ID);
     map.add("client_secret", CLIENT_SECRET);
     map.add("refresh_token", refreshToken);
 
-    // Créer les headers
+    
     HttpHeaders headers = new HttpHeaders();
     headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
     HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
 
     try {
-        // 🔹 Log du token avant l'envoi
+        // Log du token avant l'envoi
         System.out.println("Token envoyé à Keycloak : " + refreshToken);
 
         // Envoi de la requête vers Keycloak
         ResponseEntity<String> response = restTemplate.postForEntity(LOGOUT_URL, request, String.class);
 
-        // 🔹 Log de la réponse de Keycloak
+        //  Log de la réponse de Keycloak
         System.out.println("Réponse Keycloak : " + response.getBody());
 
         return ResponseEntity.ok(Map.of("message", "Logged out from Keycloak successfully"));
 
     } catch (Exception e) {
-        e.printStackTrace(); // 🔹 Voir l'erreur complète dans la console
+        e.printStackTrace(); 
         return ResponseEntity.status(400).body(Map.of(
                 "error", "Logout failed",
                 "details", e.getMessage()
@@ -118,7 +112,7 @@ public ResponseEntity<?> getAllUsersWithRoles() {
         authHeaders.setBearerAuth(accessToken);
         HttpEntity<String> entity = new HttpEntity<>(authHeaders);
 
-        String usersUrl = "http://localhost:8088/admin/realms/enda_tao_realm/users";
+        String usersUrl = "http://192.168.150.163:8088/admin/realms/enda_tao_realm/users";
         ResponseEntity<Object[]> usersResponse = restTemplate.exchange(usersUrl, HttpMethod.GET, entity, Object[].class);
 
         Object[] users = usersResponse.getBody();
@@ -128,7 +122,7 @@ public ResponseEntity<?> getAllUsersWithRoles() {
             Map userMap = (Map) userObj;
             String userId = (String) userMap.get("id");
 
-            String rolesUrl = "http://localhost:8088/admin/realms/enda_tao_realm/users/" + userId + "/role-mappings/realm";
+            String rolesUrl = "http://192.168.150.163:8088/admin/realms/enda_tao_realm/users/" + userId + "/role-mappings/realm";
             ResponseEntity<Object[]> rolesResponse = restTemplate.exchange(rolesUrl, HttpMethod.GET, entity, Object[].class);
 
             // Ajouter les rôles à l'objet utilisateur
@@ -144,6 +138,37 @@ public ResponseEntity<?> getAllUsersWithRoles() {
         ));
     }
 }
+
+
+@PostMapping("/refresh")
+public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
+    String refreshToken = body.get("refreshToken");
+    if (refreshToken == null || refreshToken.isEmpty()) {
+        return ResponseEntity.badRequest().body(Map.of("error", "Refresh token is missing"));
+    }
+
+    RestTemplate restTemplate = new RestTemplate();
+    MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+    params.add("grant_type", "refresh_token");
+    params.add("client_id", CLIENT_ID);
+    params.add("client_secret", CLIENT_SECRET);
+    params.add("refresh_token", refreshToken);
+
+    HttpHeaders headers = new HttpHeaders();
+    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
+
+    try {
+        ResponseEntity<Map> response = restTemplate.postForEntity(TOKEN_URL, request, Map.class);
+        System.out.println("Refresh token response: " + response.getBody());
+        return ResponseEntity.ok(response.getBody());
+    } catch (Exception e) {
+        e.printStackTrace();
+        return ResponseEntity.status(401).body(Map.of("error", "Refresh failed", "details", e.getMessage()));
+    }
+}
+
 
 
 }

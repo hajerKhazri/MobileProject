@@ -15,7 +15,7 @@ public class KeycloakUserService {
 
     // Connexion à Keycloak via admin-cli du realm master
     private Keycloak keycloak = KeycloakBuilder.builder()
-            .serverUrl("http://localhost:8088/")   // URL de ton Keycloak
+            .serverUrl("http://192.168.150.163:8088/")   // URL de ton Keycloak
             .realm("enda_tao_realm")                       // Realm admin
             .username("admin")                     // Admin username
             .password("admin")                     // Admin password

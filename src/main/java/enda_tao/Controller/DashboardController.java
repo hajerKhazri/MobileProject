@@ -23,29 +23,25 @@ public class DashboardController {
     @Autowired
     private KeycloakAdminService keycloakAdminService;
 
-    // Injection du service via le constructeur
     public DashboardController(DashboardService dashboardService) {
         this.dashboardService = dashboardService;
     }
 
-    // ── GET /dashboard/superviseur/{name} ─────────────────────
     @GetMapping("/superviseur/{name}")
     public List<Map<String, Object>> getAgents(@PathVariable String name) {
         try {
             return dashboardService.getAgentsBySuperviseur(name);
         } catch (Exception e) {
-            e.printStackTrace(); // Affiche l'erreur dans la console
+            e.printStackTrace(); 
             return List.of(Map.of("error", e.getMessage()));
         }
     }
 
-    // ── GET /dashboard/superviseurs ──────────────────────────
     @GetMapping("/superviseurs")
     public ResponseEntity<List<String>> getAllSuperviseurs() {
         return ResponseEntity.ok(dashboardService.getAllSuperviseurs());
     }
 
-    // ── PUT /dashboard/assign-role/{userId} ──────────────────
     @PutMapping("/assign-role/{userId}")
     public ResponseEntity<String> assignRole(@PathVariable String userId) {
         try {
@@ -57,7 +53,6 @@ public class DashboardController {
         }
     }
 
-    // ── PUT /dashboard/assign-region/{userId}?region=xxx ────
     @PutMapping("/assign-region/{userId}")
     public ResponseEntity<String> assignRegion(
             @PathVariable String userId,
@@ -71,7 +66,6 @@ public class DashboardController {
         }
     }
 
-    // ── GET /dashboard/regions ───────────────────────────────
     @GetMapping("/regions")
     public ResponseEntity<List<String>> getRegions() {
         try {
@@ -83,7 +77,6 @@ public class DashboardController {
         }
     }
 
-    // ── PUT /dashboard/unassign-role/{userId} ───────────────
     @PutMapping("/unassign-role/{userId}")
     public ResponseEntity<String> unassignRole(@PathVariable String userId) {
         try {
@@ -96,13 +89,11 @@ public class DashboardController {
     }
 
  
- @GetMapping("/check-superadmin")
-public ResponseEntity<Map<String, Boolean>> checkSuperAdmin(@AuthenticationPrincipal Jwt jwt) {
+    @GetMapping("/check-superadmin")
+    public ResponseEntity<Map<String, Boolean>> checkSuperAdmin(@AuthenticationPrincipal Jwt jwt) {
     if (jwt == null) {
         return ResponseEntity.status(401).body(Map.of("isSuperAdmin", false));
     }
-
-    // Récupérer les rôles dans le token
     Map<String, Object> realmAccess = (Map<String, Object>) jwt.getClaims().get("realm_access");
     List<String> roles = (List<String>) realmAccess.get("roles");
 
@@ -110,5 +101,8 @@ public ResponseEntity<Map<String, Boolean>> checkSuperAdmin(@AuthenticationPrinc
 
     return ResponseEntity.ok(Map.of("isSuperAdmin", isSuperAdmin));
 }
+
+  
+
 
 }
