@@ -8,11 +8,16 @@ import org.springframework.http.*;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 import java.util.*;
 
+
 @Service
 public class KeycloakSyncService {
+    private static final Logger logger = LoggerFactory.getLogger(KeycloakSyncService.class);
 
     private final UserRepository userRepository;
 
@@ -221,4 +226,14 @@ public class KeycloakSyncService {
 
         return "ROLE_USER";
     }
+
+ @Scheduled(cron = "0 0 * * * *")// chaque minute à la 0ème seconde
+public void syncUsersAutomatically() {
+    logger.info("🕒 Début de la synchronisation automatique Keycloak");
+    List<String> messages = syncUsers();
+    messages.forEach(logger::info);
+    logger.info("✅ Synchronisation terminée");
+}
+
+    
 }
