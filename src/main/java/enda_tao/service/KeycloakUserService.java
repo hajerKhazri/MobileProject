@@ -15,14 +15,14 @@ public class KeycloakUserService {
 
     // Connexion à Keycloak via admin-cli du realm master
     private Keycloak keycloak = KeycloakBuilder.builder()
-            .serverUrl("http://192.168.150.163:8088/")   // URL de ton Keycloak
-            .realm("enda_tao_realm")                       // Realm admin
-            .username("admin")                     // Admin username
-            .password("admin")                     // Admin password
-            .clientId("enda_tao_client")                 // Client admin CLI
+            .serverUrl("http://localhost:8088/")  
+            .realm("enda_tao_realm")                  
+            .username("admin")                     
+            .password("admin")                    
+            .clientId("enda_tao_client")             
             .build();
 
-    private final String realm = "enda_tao_realm"; // Realm cible
+    private final String realm = "enda_tao_realm"; 
 
     public String createUser(String username, String password, String role) {
 

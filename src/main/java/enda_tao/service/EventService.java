@@ -6,6 +6,7 @@ import enda_tao.Repository.EventRepository;
 import enda_tao.Repository.UserRepository;
 import enda_tao.config.SecurityUtils;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -21,94 +22,91 @@ public class EventService {
         this.userRepository = userRepository;
     }
 
-    // Création d'un événement
-    // Création d'un événement
-public Event createEvent(Event event) {
-    String username = SecurityUtils.getUsername();
+    // ==========================================================
+    // CREATE - Version corrigée
+    // ==========================================================
+    // EventService.java - createEvent
+    @Transactional
+    public Event createEvent(Event event) {
+        String username = SecurityUtils.getUsername();
+        System.out.println("👤 Utilisateur connecté: " + username);
 
-    // Récupération de la région depuis la DB
-    String region = userRepository.findByUsername(username)
-            .map(u -> u.getRegion() != null ? u.getRegion() : "")
-            .orElse("");
+        // ✅ SI L'UTILISATEUR EST ANONYMOUS, UTILISER LE PREMIER SUPERVISEUR
+        if ("anonymousUser".equals(username) || username == null || username.isEmpty()) {
+            List<String> superviseurs = event.getSuperviseur();
+            if (superviseurs != null && !superviseurs.isEmpty()) {
+                username = superviseurs.get(0);
+                System.out.println("👤 Utilisateur remplacé par le superviseur: " + username);
+            } else {
+                username = "system";
+            }
+        }
 
-    event.setCreatedBy(username);
-    event.setRegion(region);
+        // Récupérer la région DEPUIS L'ÉVÉNEMENT (pas depuis l'utilisateur)
+        String region = event.getRegion();
+        if (region == null || region.isEmpty()) {
+            region = "Non définie";
+        }
+        System.out.println("📍 Région: '" + region + "'");
 
-    // ⚡ Assurer que superviseur est non nul et unique
-    if (event.getSuperviseur() == null || event.getSuperviseur().isEmpty()) {
-        // Si aucun superviseur sélectionné, mettre au moins le créateur
-        List<String> defaultSuperviseur = new ArrayList<>();
-        defaultSuperviseur.add(username);
-        event.setSuperviseur(defaultSuperviseur);
-    } else {
-        // Trim et supprimer doublons
-        List<String> cleanSuperviseur = event.getSuperviseur().stream()
-                .map(String::trim)
-                .distinct()
-                .toList();
-        event.setSuperviseur(cleanSuperviseur);
+        // Set les champs
+        event.setCreatedBy(username);
+        event.setRegion(region);
+        event.setCloture(false);
+
+        // Gérer les superviseurs
+        List<String> superviseurs = event.getSuperviseur();
+        if (superviseurs == null || superviseurs.isEmpty()) {
+            superviseurs = new ArrayList<>();
+            superviseurs.add(username);
+            event.setSuperviseur(superviseurs);
+        }
+
+        // Gérer visitTypes
+        if (event.getVisitTypes() == null || event.getVisitTypes().isEmpty()) {
+            event.setVisitTypes(List.of("Visite"));
+        }
+
+        System.out.println("💾 Sauvegarde finale:");
+        System.out.println("   - name: " + event.getName());
+        System.out.println("   - region: " + event.getRegion());
+        System.out.println("   - superviseurString: " + event.getSuperviseurString());
+        System.out.println("   - createdBy: " + event.getCreatedBy());
+
+        return eventRepository.save(event);
     }
 
-    return eventRepository.save(event);
-}
-
-    // Récupérer tous les événements selon le rôle
-    // GET /api/events pour l'utilisateur courant
-public List<Event> getAllEvents() {
-    String username = SecurityUtils.getUsername();
-
-    // Superadmin → tous les événements
-    if (SecurityUtils.hasRole("ROLE_SUPERADMIN")) {
-        return eventRepository.findAll();
+    // ==========================================================
+    // GET ALL
+    // ==========================================================
+    public List<Event> getAllEvents() {
+        System.out.println("📡 Récupération de tous les événements");
+        try {
+            List<Event> events = eventRepository.findAll();
+            System.out.println("📡 " + events.size() + " événements trouvés");
+            return events;
+        } catch (Exception e) {
+            System.err.println("❌ Erreur récupération événements: " + e.getMessage());
+            throw e;
+        }
     }
 
-    // Regional supervisor → tout ce qu'il crée + événements assignés à ses agents
-    if (SecurityUtils.hasRole("ROLE_REGIONAL_SUPERVISOR")) {
-        String region = userRepository.findByUsername(username)
-                .map(u -> u.getRegion() != null ? u.getRegion() : "")
-                .orElse("");
-
-        // Tous les superviseurs de la région
-        List<String> supervisorUsernames = userRepository.findAll().stream()
-                .filter(u -> "ROLE_SUPERVISOR".equalsIgnoreCase(u.getRole()))
-                .filter(u -> region.equalsIgnoreCase(u.getRegion()))
-                .map(User::getUsername)
-                .toList();
-
-        List<String> usernamesToInclude = new ArrayList<>(supervisorUsernames);
-        usernamesToInclude.add(username); // ajouter le régional
-
-        // Retourner événements où créé par ces utilisateurs OU assigné à eux
-        return eventRepository.findAll().stream()
-                .filter(ev -> usernamesToInclude.contains(ev.getCreatedBy())
-                        || (ev.getSuperviseur() != null && ev.getSuperviseur().contains(username)))
-                .toList();
-    }
-
-    // Utilisateur normal → lui-même et événements où il est assigné
-    return eventRepository.findAll().stream()
-            .filter(ev -> username.equals(ev.getCreatedBy())
-                    || (ev.getSuperviseur() != null && ev.getSuperviseur().contains(username)))
-            .toList();
-}
-
-
-    // GET /api/events/agents
+    // ==========================================================
+    // GET AVAILABLE AGENTS
+    // ==========================================================
     public List<String> getAvailableAgents() {
         String username = SecurityUtils.getUsername();
 
-        // Superadmin → tous les agents actifs
-        if (SecurityUtils.hasRole("ROLE_SUPERADMIN")) {
+        if (SecurityUtils.hasRole("ROLE_SUPERADMIN") || SecurityUtils.hasRole("SUPERADMIN")) {
             return userRepository.findAll().stream()
                     .filter(u -> !Boolean.TRUE.equals(u.getIsDeleted()))
                     .map(User::getUsername)
                     .toList();
         }
 
-        // Regional supervisor → tous les superviseurs de sa région + lui-même
-        if (SecurityUtils.hasRole("ROLE_REGIONAL_SUPERVISOR")) {
+        if (SecurityUtils.hasRole("ROLE_REGIONAL_SUPERVISOR") || SecurityUtils.hasRole("REGIONAL_SUPERVISOR")) {
             String region = userRepository.findByUsername(username)
-                    .map(u -> u.getRegion() != null ? u.getRegion() : "")
+                    .map(User::getRegion)
                     .orElse("");
 
             List<String> agents = userRepository.findAll().stream()
@@ -119,31 +117,87 @@ public List<Event> getAllEvents() {
                     .toList();
 
             agents = new ArrayList<>(agents);
-            agents.add(username); // ajouter le régional lui-même
-
+            if (!agents.contains(username)) {
+                agents.add(username);
+            }
             return agents;
         }
 
-        // ROLE_USER ou autre → seulement lui-même
         return List.of(username);
     }
 
+    // ==========================================================
+    // CLOTURE
+    // ==========================================================
+    public Event cloturerEvent(Long id, List<Double> location) {
+        System.out.println("📍 Clôture événement ID: " + id);
+        System.out.println("📍 Location: " + location);
 
- public Event cloturerEvent(Long id, List<Double> location) {
-    System.out.println("Location reçue pour clôture : " + location); // <-- log ici
+        Event event = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Event non trouvé"));
 
-    Event event = eventRepository.findById(id)
-            .orElseThrow(() -> new RuntimeException("Event non trouvé"));
+        event.setCloture(true);
+        event.setPlaceClo(location);
 
-    event.setCloture(true);
-    event.setPlaceClo(location);
+        return eventRepository.save(event);
+    }
 
-    return eventRepository.save(event);
-}
-
-  public List<Event> getEventBySuperviseur(String superviseur) {
+    // ==========================================================
+    // GET BY SUPERVISEUR
+    // ==========================================================
+    public List<Event> getEventBySuperviseur(String superviseur) {
         return eventRepository.findBySuperviseur(superviseur);
     }
-    
+
+    // ==========================================================
+    // UPDATE
+    // ==========================================================
+    @Transactional
+    public Event updateEvent(Long id, Event eventData) {
+        Event existingEvent = eventRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Événement non trouvé avec ID: " + id));
+
+        // Mise à jour des champs
+        if (eventData.getName() != null) {
+            existingEvent.setName(eventData.getName());
+        }
+        if (eventData.getRegion() != null) {
+            existingEvent.setRegion(eventData.getRegion());
+        }
+        if (eventData.getSuperviseur() != null && !eventData.getSuperviseur().isEmpty()) {
+            existingEvent.setSuperviseur(eventData.getSuperviseur());
+        }
+        if (eventData.getEventDateTime() != null) {
+            existingEvent.setEventDateTime(eventData.getEventDateTime());
+        }
+        if (eventData.getVisitTypes() != null && !eventData.getVisitTypes().isEmpty()) {
+            existingEvent.setVisitTypes(eventData.getVisitTypes());
+        }
+
+        System.out.println("✅ Mise à jour événement ID: " + id);
+        return eventRepository.save(existingEvent);
+    }
+
+    // ==========================================================
+    // DELETE
+    // ==========================================================
+    @Transactional
+    public void deleteEvent(Long id) {
+        System.out.println("🔥 Suppression événement ID: " + id);
+
+        if (!eventRepository.existsById(id)) {
+            throw new RuntimeException("Événement non trouvé avec ID: " + id);
+        }
+
+        eventRepository.deleteById(id);
+        System.out.println("✅ Événement supprimé ID: " + id);
+    }
+
+    // EventService.java
+    public Event getEventById(Long id) {
+        System.out.println("🔍 Recherche événement ID: " + id);
+        return eventRepository.findById(id).orElse(null);
+    }
+
 
 }

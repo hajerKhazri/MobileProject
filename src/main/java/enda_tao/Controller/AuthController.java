@@ -1,91 +1,96 @@
 package enda_tao.Controller;
 
+import enda_tao.config.KeycloakUrls;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.client.RestTemplate;
 
-import jakarta.servlet.http.HttpServletRequest;
-import jakarta.servlet.http.HttpServletResponse;
-
 import java.util.Map;
 
 @RestController
 @RequestMapping("/auth")
+@CrossOrigin(origins = {"http://localhost:8081", "exp://localhost:8081"})
 public class AuthController {
 
-    private final String TOKEN_URL = "http://192.168.150.163:8088/realms/enda_tao_realm/protocol/openid-connect/token";
-    private final String CLIENT_ID = "enda_tao_client";
-    private final String CLIENT_SECRET = "gCKB6HWAEtPZOYg2n9naXagskjoI0UHY";
-    private final String LOGOUT_URL ="http://192.168.150.163:8088/realms/enda_tao_realm/protocol/openid-connect/logout";
+    private static final String TOKEN_URL = KeycloakUrls.TOKEN_URL;
+    private static final String LOGOUT_URL = KeycloakUrls.LOGOUT_URL;
+    private static final String CLIENT_ID = KeycloakUrls.CLIENT_ID;
 
+    @Value("${keycloak.client-secret}")
+    private String CLIENT_SECRET;
 
+    // =========================
+    // LOGIN
+    // =========================
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestParam String username, @RequestParam String password) {
+    public ResponseEntity<?> login(@RequestBody Map<String, String> body,
+                                   HttpServletResponse response) {
+
+        String username = body.get("username");
+        String password = body.get("password");
 
         RestTemplate restTemplate = new RestTemplate();
-        MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
-        map.add("grant_type", "password");
-        map.add("client_id", CLIENT_ID);
-        map.add("client_secret", CLIENT_SECRET);
-        map.add("username", username);
-        map.add("password", password);
+
+        MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+        params.add("grant_type", "password");
+        params.add("client_id", CLIENT_ID);
+        params.add("client_secret", CLIENT_SECRET);
+        params.add("username", username);
+        params.add("password", password);
 
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
 
-        HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
+        HttpEntity<MultiValueMap<String, String>> request =
+                new HttpEntity<>(params, headers);
 
         try {
-            ResponseEntity<Map> response = restTemplate.postForEntity(TOKEN_URL, request, Map.class);
-            return ResponseEntity.ok(response.getBody());
+            ResponseEntity<Map> kcResponse =
+                    restTemplate.postForEntity(TOKEN_URL, request, Map.class);
+
+            String accessToken = (String) kcResponse.getBody().get("access_token");
+            String refreshToken = (String) kcResponse.getBody().get("refresh_token");
+
+            // =========================
+            // ACCESS COOKIE
+            // =========================
+            Cookie accessCookie = new Cookie("ACCESS_TOKEN", accessToken);
+            accessCookie.setHttpOnly(true);
+            accessCookie.setPath("/");
+            accessCookie.setMaxAge(3600);
+            accessCookie.setSecure(false); // TRUE en HTTPS
+            response.addCookie(accessCookie);
+
+            // =========================
+            // REFRESH COOKIE
+            // =========================
+            Cookie refreshCookie = new Cookie("REFRESH_TOKEN", refreshToken);
+            refreshCookie.setHttpOnly(true);
+            refreshCookie.setPath("/");
+            refreshCookie.setMaxAge(7 * 24 * 3600);
+            refreshCookie.setSecure(false); // TRUE en HTTPS
+            response.addCookie(refreshCookie);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Login successful",
+                    "token", accessToken,   // ⚠️ C'est LA ligne qui sauve ton app
+                    "refreshToken", refreshToken
+            ));
+
         } catch (Exception e) {
-            return ResponseEntity.status(401).body(Map.of("error", "Invalid username or password"));
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "Invalid credentials"));
         }
     }
 
 
-    @PostMapping("/logout")
-    public ResponseEntity<?> logout(@RequestParam String refreshToken) {
-
-    RestTemplate restTemplate = new RestTemplate();
-
-    MultiValueMap<String, String> map = new LinkedMultiValueMap<>();
-    map.add("client_id", CLIENT_ID);
-    map.add("client_secret", CLIENT_SECRET);
-    map.add("refresh_token", refreshToken);
-
-    
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
-
-    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(map, headers);
-
-    try {
-        // Log du token avant l'envoi
-        System.out.println("Token envoyé à Keycloak : " + refreshToken);
-
-        // Envoi de la requête vers Keycloak
-        ResponseEntity<String> response = restTemplate.postForEntity(LOGOUT_URL, request, String.class);
-
-        //  Log de la réponse de Keycloak
-        System.out.println("Réponse Keycloak : " + response.getBody());
-
-        return ResponseEntity.ok(Map.of("message", "Logged out from Keycloak successfully"));
-
-    } catch (Exception e) {
-        e.printStackTrace(); 
-        return ResponseEntity.status(400).body(Map.of(
-                "error", "Logout failed",
-                "details", e.getMessage()
-        ));
-    }
-}
-
-
-
-@GetMapping("/users")
+    @GetMapping("/users")
 public ResponseEntity<?> getAllUsersWithRoles() {
 
     RestTemplate restTemplate = new RestTemplate();
@@ -112,7 +117,7 @@ public ResponseEntity<?> getAllUsersWithRoles() {
         authHeaders.setBearerAuth(accessToken);
         HttpEntity<String> entity = new HttpEntity<>(authHeaders);
 
-        String usersUrl = "http://192.168.150.163:8088/admin/realms/enda_tao_realm/users";
+        String usersUrl = KeycloakUrls.ADMIN_USERS_URL;
         ResponseEntity<Object[]> usersResponse = restTemplate.exchange(usersUrl, HttpMethod.GET, entity, Object[].class);
 
         Object[] users = usersResponse.getBody();
@@ -122,7 +127,7 @@ public ResponseEntity<?> getAllUsersWithRoles() {
             Map userMap = (Map) userObj;
             String userId = (String) userMap.get("id");
 
-            String rolesUrl = "http://192.168.150.163:8088/admin/realms/enda_tao_realm/users/" + userId + "/role-mappings/realm";
+            String rolesUrl = String.format(KeycloakUrls.ADMIN_USER_ROLES_URL, userId);
             ResponseEntity<Object[]> rolesResponse = restTemplate.exchange(rolesUrl, HttpMethod.GET, entity, Object[].class);
 
             // Ajouter les rôles à l'objet utilisateur
@@ -140,35 +145,130 @@ public ResponseEntity<?> getAllUsersWithRoles() {
 }
 
 
-@PostMapping("/refresh")
-public ResponseEntity<?> refresh(@RequestBody Map<String, String> body) {
-    String refreshToken = body.get("refreshToken");
-    if (refreshToken == null || refreshToken.isEmpty()) {
-        return ResponseEntity.badRequest().body(Map.of("error", "Refresh token is missing"));
+    // =========================
+    // LOGOUT
+    // =========================
+    @PostMapping("/logout")
+    public ResponseEntity<?> logout(HttpServletRequest request,
+                                    HttpServletResponse response) {
+
+        String refreshToken = extractCookie(request, "REFRESH_TOKEN");
+
+        if (refreshToken == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Refresh token missing"));
+        }
+
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("client_id", CLIENT_ID);
+            params.add("client_secret", CLIENT_SECRET);
+            params.add("refresh_token", refreshToken);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            HttpEntity<MultiValueMap<String, String>> entity =
+                    new HttpEntity<>(params, headers);
+
+            restTemplate.postForEntity(LOGOUT_URL, entity, String.class);
+
+            clearCookies(response);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Logged out successfully"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(400)
+                    .body(Map.of("error", "Logout failed"));
+        }
     }
 
-    RestTemplate restTemplate = new RestTemplate();
-    MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
-    params.add("grant_type", "refresh_token");
-    params.add("client_id", CLIENT_ID);
-    params.add("client_secret", CLIENT_SECRET);
-    params.add("refresh_token", refreshToken);
+    // =========================
+    // REFRESH TOKEN
+    // =========================
+    @PostMapping("/refresh")
+    public ResponseEntity<?> refresh(HttpServletRequest request,
+                                     HttpServletResponse response) {
 
-    HttpHeaders headers = new HttpHeaders();
-    headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+        String refreshToken = extractCookie(request, "REFRESH_TOKEN");
 
-    HttpEntity<MultiValueMap<String, String>> request = new HttpEntity<>(params, headers);
+        if (refreshToken == null) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Refresh token missing"));
+        }
 
-    try {
-        ResponseEntity<Map> response = restTemplate.postForEntity(TOKEN_URL, request, Map.class);
-        System.out.println("Refresh token response: " + response.getBody());
-        return ResponseEntity.ok(response.getBody());
-    } catch (Exception e) {
-        e.printStackTrace();
-        return ResponseEntity.status(401).body(Map.of("error", "Refresh failed", "details", e.getMessage()));
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+
+            MultiValueMap<String, String> params = new LinkedMultiValueMap<>();
+            params.add("grant_type", "refresh_token");
+            params.add("client_id", CLIENT_ID);
+            params.add("client_secret", CLIENT_SECRET);
+            params.add("refresh_token", refreshToken);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+            HttpEntity<MultiValueMap<String, String>> entity =
+                    new HttpEntity<>(params, headers);
+
+            ResponseEntity<Map> kcResponse =
+                    restTemplate.postForEntity(TOKEN_URL, entity, Map.class);
+
+            String newAccess = (String) kcResponse.getBody().get("access_token");
+            String newRefresh = (String) kcResponse.getBody().get("refresh_token");
+
+            setCookie(response, "ACCESS_TOKEN", newAccess, 3600);
+            setCookie(response, "REFRESH_TOKEN", newRefresh, 7 * 24 * 3600);
+
+            return ResponseEntity.ok(Map.of(
+                    "message", "Token refreshed"
+            ));
+
+        } catch (Exception e) {
+            return ResponseEntity.status(401)
+                    .body(Map.of("error", "Refresh failed"));
+        }
     }
-}
 
+   
+    private String extractCookie(HttpServletRequest request, String name) {
+        if (request.getCookies() == null) return null;
 
+        for (Cookie c : request.getCookies()) {
+            if (name.equals(c.getName())) return c.getValue();
+        }
+        return null;
+    }
 
+    private void setCookie(HttpServletResponse response,
+                           String name,
+                           String value,
+                           int maxAge) {
+
+        Cookie cookie = new Cookie(name, value);
+        cookie.setHttpOnly(true);
+        cookie.setPath("/");
+        cookie.setMaxAge(maxAge);
+        cookie.setSecure(false); // true en HTTPS
+        response.addCookie(cookie);
+    }
+
+    private void clearCookies(HttpServletResponse response) {
+
+        Cookie access = new Cookie("ACCESS_TOKEN", "");
+        access.setPath("/");
+        access.setMaxAge(0);
+
+        Cookie refresh = new Cookie("REFRESH_TOKEN", "");
+        refresh.setPath("/");
+        refresh.setMaxAge(0);
+
+        response.addCookie(access);
+        response.addCookie(refresh);
+    }
 }

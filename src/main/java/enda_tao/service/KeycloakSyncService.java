@@ -25,9 +25,9 @@ public class KeycloakSyncService {
         this.userRepository = userRepository;
     }
 
-    private final String tokenUrl = "http://192.168.150.163:8088/realms/enda_tao_realm/protocol/openid-connect/token";
-    private final String usersUrl = "http://192.168.150.163:8088/admin/realms/enda_tao_realm/users";
-    private final String rolesUrl = "http://192.168.150.163:8088/admin/realms/enda_tao_realm/users/";
+    private final String tokenUrl = "http://localhost:8088/realms/enda_tao_realm/protocol/openid-connect/token";
+    private final String usersUrl = "http://localhost:8088/admin/realms/enda_tao_realm/users";
+    private final String rolesUrl = "http://localhost:8088/admin/realms/enda_tao_realm/users/";
 
     private final String adminUsername = "superadmin";
     private final String adminPassword = "admin";

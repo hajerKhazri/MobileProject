@@ -10,8 +10,8 @@ import org.springframework.context.annotation.Configuration;
 public class KeycloakConfig {
 
     // ⚡ Renseigne tes données Keycloak
-    private final String serverUrl = "http://192.168.150.163:8088";
-    private final String realm = "enda_tao_realm";
+    private final String serverUrl = KeycloakUrls.BASE_URL;
+    private final String realm = KeycloakUrls.REALM;
     private final String clientId = "admin-cli";
     private final String username = "superadmin";
     private final String password = "admin";
