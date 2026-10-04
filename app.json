@@ -17,11 +17,21 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "package": "com.khazrihajer.MobileProject",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAJpVxpQjJRXa3neG2NzgHOpatNCEQ6shY"
+        }
+      }
     },
     "web": {
       "output": "static",
-      "favicon": "./assets/images/favicon.png"
+      "favicon": "./assets/images/favicon.png",
+      "config": {
+        "googleMaps": {
+          "apiKey": "AIzaSyAJpVxpQjJRXa3neG2NzgHOpatNCEQ6shY"
+        }
+      }
     },
     "plugins": [
       "expo-router",
@@ -32,11 +42,29 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
         }
+      ],
+      "expo-web-browser",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "compileSdkVersion": 36,
+            "targetSdkVersion": 36,
+            "buildToolsVersion": "36.0.0"
+          }
+        }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "3070f7ff-3913-4775-8d79-52f693a29d9a"
+      }
     }
   }
 }
